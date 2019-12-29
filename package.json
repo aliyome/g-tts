@@ -1,0 +1,11 @@
+{
+  "name": "g-tts",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "aliyome",
+  "license": "MIT",
+  "private": true,
+  "dependencies": {
+    "@google-cloud/text-to-speech": "^2.1.0"
+  }
+}
