@@ -1,11 +1,15 @@
 {
-  "name": "g-tts",
-  "version": "1.0.0",
-  "main": "index.js",
-  "author": "aliyome",
-  "license": "MIT",
-  "private": true,
-  "dependencies": {
-    "@google-cloud/text-to-speech": "^2.1.0"
-  }
+	"name": "g-tts",
+	"version": "2.0.0",
+	"main": "index.ts",
+	"author": "aliyome",
+	"license": "MIT",
+	"private": true,
+	"scripts": {
+		"start": "GOOGLE_APPLICATION_CREDENTIALS=./service-account.json bun run index.ts",
+		"build": "bun build --compile --outfile=tts ./index.ts"
+	},
+	"dependencies": {
+		"@google-cloud/text-to-speech": "^6.3.1"
+	}
 }
