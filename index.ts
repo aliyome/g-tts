@@ -21,28 +21,86 @@ const text2mp3 = async (text: string) => {
 	return res.audioContent;
 };
 
-/// splitTextToNChars は入力文字列をだいたいn文字毎に分割します。
-/// 行の途中で分割されないようにn文字以内に収めています。
-const splitTextToNChars = (text: string, n: number) => {
-	const sentences: string[] = [];
-	const lines = text.replace(/\r?\n/g, "\n").replace(/\n+/g, "\n").split("\n");
+const HARD_BOUNDARY_REGEX = /(?<=[。．？！?!\n])/;
+const SOFT_BOUNDARY_REGEX = /(?<=[、，,])/;
 
-	let sentence = "";
-	while (lines.length > 0) {
-		const line = lines.shift();
-		if (!line) {
+const hardSplit = (segment: string, limit: number) => {
+	const chunks: string[] = [];
+	for (let i = 0; i < segment.length; i += limit) {
+		chunks.push(segment.slice(i, i + limit));
+	}
+	return chunks;
+};
+
+const splitWithSoftBoundaries = (segment: string, limit: number) => {
+	if (segment.length <= limit) {
+		return [segment];
+	}
+	const softParts = segment.split(SOFT_BOUNDARY_REGEX);
+	if (softParts.length === 1) {
+		return hardSplit(segment, limit);
+	}
+	const chunks: string[] = [];
+	let buffer = "";
+	for (const part of softParts) {
+		if (!part) {
 			continue;
 		}
-		if (sentence.length + line?.length < n) {
-			sentence = sentence.concat("\n").concat(line);
+		if (part.length > limit) {
+			if (buffer) {
+				chunks.push(buffer);
+				buffer = "";
+			}
+			chunks.push(...hardSplit(part, limit));
+			continue;
+		}
+		if (buffer.length + part.length <= limit) {
+			buffer = buffer.concat(part);
 		} else {
-			sentences.push(sentence);
-			sentence = line;
+			chunks.push(buffer);
+			buffer = part;
 		}
 	}
-	sentences.push(sentence);
+	if (buffer) {
+		chunks.push(buffer);
+	}
+	return chunks;
+};
 
-	return sentences;
+/// splitTextToNChars は句読点と改行を優先しつつn文字以内で分割します。
+const splitTextToNChars = (text: string, n: number) => {
+	const normalized = text.replace(/\r\n?/g, "\n");
+	const rawSegments = normalized.split(HARD_BOUNDARY_REGEX);
+	const sentences: string[] = [];
+	let buffer = "";
+
+	for (const raw of rawSegments) {
+		const segment = raw.replace(/^[ \t]+/, "");
+		if (!segment) {
+			continue;
+		}
+		const pieces = splitWithSoftBoundaries(segment, n);
+		for (const piece of pieces) {
+			if (!piece) {
+				continue;
+			}
+			const chunk = piece;
+			if (buffer.length === 0) {
+				buffer = chunk;
+				continue;
+			}
+			if (buffer.length + chunk.length <= n) {
+				buffer = buffer.concat(chunk);
+			} else {
+				sentences.push(buffer.trim());
+				buffer = chunk;
+			}
+		}
+	}
+	if (buffer) {
+		sentences.push(buffer.trim());
+	}
+	return sentences.filter((sentence) => sentence.length > 0);
 };
 
 const main = async () => {
@@ -67,10 +125,10 @@ const main = async () => {
 	for (const path of paths) {
 		const filename = path.replace(/\..*$/, "");
 		const text = readFileSync(path, { encoding: "utf8" });
-		const sentences = splitTextToNChars(text, 4800);
+		const sentences = splitTextToNChars(text, 1500);
 		for (let i = 0; i < sentences.length; i++) {
 			const sentence = sentences[i];
-			console.log(sentence);
+			console.log(i, sentence);
 			const mp3 = await text2mp3(sentence);
 			if (!mp3) {
 				throw new Error("音声データの取得に失敗しました");
